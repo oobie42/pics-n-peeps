@@ -4,43 +4,28 @@
 // c) use Solid's <For> to iterate over the list returned by the db query
 // d) use Solid's Component for a very simple component
 // e) pass values from parent to child component using props
+// Step 2:
+// a) get a given Firebase doc from its id
+// b) use a signal to parameterize calling a resource fetcher
 
 import type { Component } from 'solid-js';
-import { createResource } from 'solid-js';
+import { createResource, createSignal } from 'solid-js';
 
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, query, orderBy } from 'firebase/firestore/lite';
+import { doc, getFirestore, collection, getDoc, getDocs, query, orderBy } from 'firebase/firestore/lite';
 
-// This is expected to be a "firebaseConfig" as found in the Firebase Console.
-// This is expected to be of the form:
-// const firebaseConfig = {
-//   apiKey: "API_KEY",
-//   authDomain: "PROJECT.firebaseapp.com",
-//   databaseURL: "https://PROJECT.firebaseio.com",
-//   projectId: "PROJECT",
-//   storageBucket: "PROJECT.appspot.com",
-//   messagingSenderId: "MESSAGING_ID",
-//   appId: "APP_ID",
-//   measurementId: "MEASUREMENT_ID"
-// };
-// All items in CAPS are expected to be values from the FB Console.
 import { firebaseConfig } from './firebase-config';
 
 // Initialize Firebase
 const firebaseApp = initializeApp(firebaseConfig);
 const firebaseDb = getFirestore(firebaseApp);
 
-// Unused code shows how to get all "documents" in the "collection".
 async function getAllThePeeps() {
-  const docs = await getDocs(collection(firebaseDb, 'peeps'));
+  const peeps = collection(firebaseDb, 'peeps');
+  const docs = await getDocs(peeps);
   return docs.docs.map(doc => doc.data());
 }
 
-// Each FB DB "document" is expected to have a "first" and "born" field.
-// The "first" field is expected to be a string.  The "born" field is a map
-// which futher is expected to have a "year" field of type number.
-// This function queries for all "documents" in the "collection" ordered by
-// year ascending.
 async function getPeepsByYear() {
   const peeps = collection(firebaseDb, 'peeps');
   const q = query(peeps, orderBy("born.year", "asc"));
@@ -48,21 +33,37 @@ async function getPeepsByYear() {
   return snapshot.docs.map(doc => doc.data());
 }
 
+async function fetchFirstName(peepId) {
+  const snap = await getDoc(doc(firebaseDb, 'peeps', peepId));
+  return snap.exists() ? snap.data().first : "unknown";
+}
+
+// To use the fatherId/motherId property as an argument to fetchFirstName
+// these need corresponding signals.
 const Peep: Component = (props) => {
+  const [getFatherId] = createSignal(props.fatherId);
+  const [getFatherName] = createResource(getFatherId, fetchFirstName);
+  const [getMotherId] = createSignal(props.motherId);
+  const [getMotherName] = createResource(getMotherId, fetchFirstName);
   return (
-    <div>{props.yearBorn} {props.name}</div>
+    <div>{props.first}; Born: {props.yearBorn}; Father: {getFatherName()}; Mother: {getMotherName()}</div>
   );
 }
 
+// This presumes a list of objects that each have "first", "fatherId",
+// "motherId" and "born" fields.
 const App: Component = () => {
   const [peeps] = createResource(getPeepsByYear);
-  //const [peeps] = createResource(getAllThePeeps);
   return (
     <>
       <div>{peeps.loading && "Loading..."}</div>
       <div>
         <For each={peeps()}>{(peep, i) =>
-          <Peep name={peep.first} yearBorn={peep.born.year}/>
+          <Peep
+              first={peep.first}
+              yearBorn={peep.born.year}
+              fatherId={peep.fatherId}
+              motherId={peep.motherId} />
         }</For>
       </div>
     </>
