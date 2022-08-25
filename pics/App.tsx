@@ -1,9 +1,9 @@
-// Step 3:
+// Step 4:
 // a) get the list of pics from the FB DB "pics" collection
 // b) each pic has a:
 //   i)  FB Storage bucket name ("bucket")
 //     1) the bucket name is translated to a URL to use with <img>
-//   ii) id for a document in the FB DB "peeps" collection ("peepId")
+//   ii) list of ids for documents in the FB DB "peeps" collection ("who")
 //     1) the "peep" document is expected to have a "first" (name) field
 import type { Component } from 'solid-js';
 import { createSignal, createResource } from 'solid-js';
@@ -37,11 +37,17 @@ async function fetchPeepFirstName(peepId) {
   return docSnap.data().first;
 }
 
-const Names: Component = (props) => {
-  const [getPeepId] = createSignal(props.peepId);
-  const [getPeepFirstName] = createResource(getPeepId, fetchPeepFirstName);
+async function fetchFirstNames(who) {
+  return Promise.all(who.map(peepId => fetchPeepFirstName(peepId)));
+}
+
+const Who: Component = (props) => {
+  const [getWho] = createSignal(props.who);
+  const [getFirstNames] = createResource(getWho, fetchFirstNames);
   return (
-    <div>{getPeepFirstName()}</div>
+    <For each={getFirstNames()}>{(first, i) =>
+      <div>{first}</div>
+    }</For>
   );
 };
 
@@ -50,10 +56,8 @@ async function fetchPicList() {
   return docs.docs.map(doc => doc.data());
 }
 
-// This presumes a list of "documents" each with a FB Storage bucket id
-// and Id for a "document" in an FB DB.  The FB DB "document" is expected
-// to have a "first" field.
 const App: Component = () => {
+  console.log('App');
   const [getPicList] = createResource(fetchPicList);
   return (
    <>
@@ -62,7 +66,7 @@ const App: Component = () => {
        <For each={getPicList()}>{(pic, i) =>
         <>
          <Image bucket={pic.bucket} />
-         <Names peepId={pic.peepId} />
+         <Who who={pic.who} />
         </>
        }</For>
      </div>
@@ -71,4 +75,3 @@ const App: Component = () => {
 };
 
 export default App;
-
