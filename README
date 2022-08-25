@@ -1,0 +1,23 @@
+
+Initial setup:
+
+  npx degit solidjs/templates/ts peeps
+
+Local development:
+
+  cd peeps
+  npm install
+  npm install firebase
+  npm run dev
+
+Deployment
+
+  cd peeps
+  firebase init hosting
+  npm run build
+  firebase deploy --only hosting
+
+  That is, "npm run build" AFTER "firebase init hosting" b/c "f i h" installs
+  a generic FB index.html.
+
+
