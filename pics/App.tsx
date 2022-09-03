@@ -1,5 +1,10 @@
-// Step 4:
-// a) get the list of pics from the FB DB "pics" collection
+// Step 5:
+// a) paginate through the FB DB "pics" collection
+//   i) createSignal for the pagination token
+//   ii) pass the pagination signal to the resource fetcher
+//   iii) save off the last document for use as the pagination token
+//   iv) iterate (map) over the resource list to create Img+Who components
+//   v) next handler sets the pagination token which triggers a new fetch
 // b) each pic has a:
 //   i)  FB Storage bucket name ("bucket")
 //     1) the bucket name is translated to a URL to use with <img>
@@ -9,7 +14,7 @@ import type { Component } from 'solid-js';
 import { createSignal, createResource } from 'solid-js';
 
 import { initializeApp } from "firebase/app";
-import { doc, getFirestore, collection, getDoc, getDocs, query, orderBy } from 'firebase/firestore/lite';
+import { doc, getFirestore, collection, getDoc, getDocs, query, orderBy, startAfter, limit } from 'firebase/firestore/lite';
 import { getStorage, ref, getDownloadURL } from "firebase/storage";
 
 import { firebaseConfig } from './firebase-config';
@@ -51,24 +56,54 @@ const Who: Component = (props) => {
   );
 };
 
-async function fetchPicList() {
-  const docs = await getDocs(collection(firebaseDb, 'pics'));
-  return docs.docs.map(doc => doc.data());
+async function fetchPicDocs(next) {
+  let queryConstraints = [
+    collection(firebaseDb, 'pics'),
+    orderBy('bucket'),
+    limit(2)];
+  if (next) {  // "undefined" for the first query
+    queryConstraints.push(startAfter(next));
+  }
+  const snap = await getDocs(query(...queryConstraints));
+  return snap.docs;
+  // XXX how do know if this is the last page?
+}
+
+function page(pics) {
+  return (
+    <For each={pics}>{(pic, i) =>
+      <>
+        <Image bucket={pic.bucket} />
+        <Who who={pic.who} />
+      </>
+    }</For>
+  );
 }
 
 const App: Component = () => {
-  console.log('App');
-  const [getPicList] = createResource(fetchPicList);
+  const [getLast, setLast] = createSignal(0);
+  const [getPicDocs] = createResource(getLast, fetchPicDocs);
+  let last;
+  const nextHandler = () => {
+    setLast(last);  // This triggers another fetch.
+  };
+  // 1) save off the last doc for use in pagination
+  // 2) return the Image+Who components for each picDoc
+  const showPage = (picDocs) => {
+    if (picDocs == undefined) {  // XXX Why?
+      return;
+    }
+    // Do NOT call setLast here as that will cause an infinite loop.
+    last = picDocs[picDocs.length - 1];
+    return page(picDocs.map(doc => doc.data()));
+  };
+  // XXX don't show the next button if we're at the end
   return (
    <>
-     <div>{getPicList.loading && "Loading..."}</div>
+     <div>{getPicDocs.loading && "Loading..."}</div>
      <div>
-       <For each={getPicList()}>{(pic, i) =>
-        <>
-         <Image bucket={pic.bucket} />
-         <Who who={pic.who} />
-        </>
-       }</For>
+       {showPage(getPicDocs())}
+       <button onClick={[nextHandler]}>Next</button>
      </div>
    </>
   );
