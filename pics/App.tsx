@@ -1,10 +1,11 @@
-// Step 5:
+// Step 6:
 // a) paginate through the FB DB "pics" collection
 //   i) createSignal for the pagination token
 //   ii) pass the pagination signal to the resource fetcher
 //   iii) save off the last document for use as the pagination token
 //   iv) iterate (map) over the resource list to create Img+Who components
 //   v) next handler sets the pagination token which triggers a new fetch
+//   vi) back handler pops previous pagination token off the back stack
 // b) each pic has a:
 //   i)  FB Storage bucket name ("bucket")
 //     1) the bucket name is translated to a URL to use with <img>
@@ -80,12 +81,23 @@ function page(pics) {
   );
 }
 
+function pushIfNotZero(stack, object) {
+  if (object) {
+    stack.push(object);
+  }
+}
+
 const App: Component = () => {
   const [getLast, setLast] = createSignal(0);
   const [getPicDocs] = createResource(getLast, fetchPicDocs);
   let last;
+  let backStack = [];
   const nextHandler = () => {
+    pushIfNotZero(backStack, getLast());
     setLast(last);  // This triggers another fetch.
+  };
+  const backHandler = () => {
+    setLast(backStack.length ? backStack.pop() : 0);
   };
   // 1) save off the last doc for use in pagination
   // 2) return the Image+Who components for each picDoc
@@ -103,6 +115,7 @@ const App: Component = () => {
      <div>{getPicDocs.loading && "Loading..."}</div>
      <div>
        {showPage(getPicDocs())}
+       <button onClick={[backHandler]}>Back</button>
        <button onClick={[nextHandler]}>Next</button>
      </div>
    </>
