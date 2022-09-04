@@ -13,49 +13,11 @@
 //     1) the "peep" document is expected to have a "first" (name) field
 import type { Component } from 'solid-js';
 import { createSignal, createResource } from 'solid-js';
-
-import { initializeApp } from "firebase/app";
-import { doc, getFirestore, collection, getDoc, getDocs, query, orderBy, startAfter, limit } from 'firebase/firestore/lite';
-import { getStorage, ref, getDownloadURL } from "firebase/storage";
-
-import { firebaseConfig } from './firebase-config';
-
-// Initialize Firebase
-const firebaseApp = initializeApp(firebaseConfig);
-const firebaseDb = getFirestore(firebaseApp);
-const storage = getStorage(firebaseApp, firebaseConfig.storage);
-
-async function fetchPicUrl(bucket) {
-  const url = await getDownloadURL(ref(storage, bucket));
-  return url;
-}
-
-const Image: Component = (props) => {
-  const [getBucket] = createSignal(props.bucket);
-  const [getPicUrl] = createResource(getBucket, fetchPicUrl);
-  return (
-    <img src={getPicUrl()} />
-  );
-};
-
-async function fetchPeepFirstName(peepId) {
-  const docSnap = await getDoc(doc(firebaseDb, 'peeps', peepId));
-  return docSnap.data().first;
-}
-
-async function fetchFirstNames(who) {
-  return Promise.all(who.map(peepId => fetchPeepFirstName(peepId)));
-}
-
-const Who: Component = (props) => {
-  const [getWho] = createSignal(props.who);
-  const [getFirstNames] = createResource(getWho, fetchFirstNames);
-  return (
-    <For each={getFirstNames()}>{(first, i) =>
-      <div>{first}</div>
-    }</For>
-  );
-};
+import { doc, collection, getDoc, getDocs, query, orderBy, startAfter, limit } from 'firebase/firestore/lite';
+import { ref, getDownloadURL } from "firebase/storage";
+import { firebaseDb, firebaseStorage } from './Firebase';
+import { Image } from './Image';
+import { Who } from './Who';
 
 async function fetchPicDocs(next) {
   let queryConstraints = [
